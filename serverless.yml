@@ -9,7 +9,7 @@ provider:
   iam:
     role: arn:aws:iam::397279833444:role/LabRole
   environment:
-    TABLE_NAME_PROGRAMACION: ${self:provider.stage}-tp_programacion
+    TABLE_NAME_PROGRAMACION: ${sls:stage}-tp_programacion
 
 functions:
   crearProgramacion:
