@@ -1,0 +1,71 @@
+service: api-programacion
+org: danielcaballeros
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  memorySize: 1024
+  timeout: 30
+  iam:
+    role: arn:aws:iam::397279833444:role/LabRole
+  environment:
+    TABLE_NAME_PROGRAMACION: ${self:provider.stage}-tp_programacion
+
+functions:
+  crearProgramacion:
+    handler: crearProgramacion.handler
+    events:
+      - http:
+          path: /programacion
+          method: post
+          cors: true
+
+  obtenerProgramacionById:
+    handler: obtenerProgramacionById.handler
+    events:
+      - http:
+          path: /programacion/{tenant_id}/{ordenamiento}
+          method: get
+          cors: true
+
+  obtenerProgramaciones:
+    handler: obtenerProgramaciones.handler
+    events:
+      - http:
+          path: /programaciones
+          method: get
+          cors: true
+
+  modificarProgramacion:
+    handler: modificarProgramacion.handler
+    events:
+      - http:
+          path: /programacion/{tenant_id}/{ordenamiento}
+          method: put
+          cors: true
+
+  eliminarProgramacion:
+    handler: eliminarProgramacion.handler
+    events:
+      - http:
+          path: /programacion
+          method: delete
+          cors: true
+
+resources:
+  Resources:
+    ProgramacionTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME_PROGRAMACION}
+        AttributeDefinitions:
+          - AttributeName: tenant_id
+            AttributeType: S
+          - AttributeName: ordenamiento
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tenant_id
+            KeyType: HASH
+          - AttributeName: ordenamiento
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
