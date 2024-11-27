@@ -3,7 +3,7 @@ org: danielcaballeros
 
 provider:
   name: aws
-  runtime: nodejs14.x
+  runtime: nodejs16.x
   memorySize: 1024
   timeout: 30
   iam:
