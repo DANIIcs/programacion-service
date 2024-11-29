@@ -1,28 +1,58 @@
 const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
-
-const PROGRAMACION_TABLE = process.env.TABLE_NAME_PROGRAMACION;
 
 exports.handler = async (event) => {
-    try {
-        const { tenant_id, ordenamiento } = event.pathParameters;
+    console.log(event);
 
+    try {
+        // Validar variables de entorno
+        if (!process.env.TABLE_NAME_PROGRAMACION) {
+            return {
+                statusCode: 500,
+                status: 'Internal Server Error - Variable de entorno TABLE_NAME_PROGRAMACION no configurada',
+            };
+        }
+
+        const tablaProgramacion = process.env.TABLE_NAME_PROGRAMACION;
+
+        // Obtener parámetros
+        const { tenant_id, ordenamiento } = event.pathParameters || {};
+
+        // Validar datos
+        if (!tenant_id || !ordenamiento) {
+            return {
+                statusCode: 400,
+                status: 'Bad Request - tenant_id y ordenamiento son obligatorios',
+            };
+        }
+
+        // Obtener programación de DynamoDB
+        const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
-            TableName: PROGRAMACION_TABLE,
+            TableName: tablaProgramacion,
             Key: { tenant_id, ordenamiento },
         };
 
         const result = await dynamodb.get(params).promise();
 
         if (!result.Item) {
-            return { statusCode: 404, body: JSON.stringify({ message: 'Programación no encontrada' }) };
+            return {
+                statusCode: 404,
+                status: 'Not Found - Programación no encontrada',
+            };
         }
 
-        return { statusCode: 200, body: JSON.stringify({ programacion: result.Item }) };
+        // Respuesta exitosa
+        return {
+            statusCode: 200,
+            message: 'Programación obtenida exitosamente',
+            programacion: result.Item,
+        };
     } catch (error) {
+        console.error(`Error inesperado: ${error.message}`);
         return {
             statusCode: 500,
-            body: JSON.stringify({ message: 'Error al obtener la programación' }),
+            status: 'Internal Server Error - Error al obtener la programación',
+            error: error.message,
         };
     }
 };
