@@ -32,7 +32,7 @@ exports.handler = async (event) => {
             Key: { tenant_id, ordenamiento },
         }).promise();
 
-        // Respuesta exitosa
+        // Respuesta exitsaa
         return {
             statusCode: 200,
             message: 'Programación eliminada exitosamente',
