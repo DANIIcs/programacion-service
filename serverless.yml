@@ -60,24 +60,26 @@ resources:
       Properties:
         TableName: ${self:provider.environment.TABLE_NAME_PROGRAMACION}
         AttributeDefinitions:
-          - AttributeName: tenant_id
+          - AttributeName: tenantcine_id
             AttributeType: S
           - AttributeName: ordenamiento
             AttributeType: S
-          - AttributeName: estado
-            AttributeType: S  # Para GSI basado en estado
+          - AttributeName: tenantpelicula_id
+            AttributeType: S 
+          - AttributeName: ordenamiento_GSI
+            AttributeType: S
         KeySchema:
-          - AttributeName: tenant_id
+          - AttributeName: tenantcine_id
             KeyType: HASH
           - AttributeName: ordenamiento
             KeyType: RANGE
-        # Índice Secundario Global (GSI) - Estado
+        # Índice Secundario Global (GSI)
         GlobalSecondaryIndexes:
-          - IndexName: EstadoIndex
+          - IndexName: PeliculaIndex
             KeySchema:
-              - AttributeName: estado
+              - AttributeName: tenantpelicula_id
                 KeyType: HASH
-              - AttributeName: ordenamiento
+              - AttributeName: ordenamiento_GSI
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL
