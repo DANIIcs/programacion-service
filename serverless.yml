@@ -64,9 +64,21 @@ resources:
             AttributeType: S
           - AttributeName: ordenamiento
             AttributeType: S
+          - AttributeName: estado
+            AttributeType: S  # Para GSI basado en estado
         KeySchema:
           - AttributeName: tenant_id
             KeyType: HASH
           - AttributeName: ordenamiento
             KeyType: RANGE
+        # Índice Secundario Global (GSI) - Estado
+        GlobalSecondaryIndexes:
+          - IndexName: EstadoIndex
+            KeySchema:
+              - AttributeName: estado
+                KeyType: HASH
+              - AttributeName: ordenamiento
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
