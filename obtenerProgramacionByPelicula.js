@@ -1,57 +1,99 @@
 const AWS = require('aws-sdk');
 
 exports.handler = async (event) => {
-    console.log(event);
+    console.log('Obteniendo programaciones por títulos');
 
     try {
-        // Validar variables de entorno
-        if (!process.env.TABLE_NAME_PROGRAMACION) {
+        // Validar las variables de entorno
+        if (!process.env.TABLE_NAME_PROGRAMACION || !process.env.LAMBDA_VALIDAR_TOKEN) {
             return {
                 statusCode: 500,
-                status: 'Internal Server Error - Variable de entorno TABLE_NAME_PROGRAMACION no configurada',
+                status: 'Internal Server Error - Variables de entorno no configuradas',
             };
         }
 
         const tablaProgramacion = process.env.TABLE_NAME_PROGRAMACION;
+        const lambdaToken = process.env.LAMBDA_VALIDAR_TOKEN;
 
-        // Obtener parámetros
-        const { tenant_id, ordenamiento } = event.pathParameters || {};
+        // Analizar el cuerpo de la solicitud
+        let body = event.body || {};
+        if (typeof body === 'string') {
+            body = JSON.parse(body);
+        }
 
-        // Validar datos
-        if (!tenant_id || !ordenamiento) {
+        // Obtener los parámetros necesarios
+        const tenant_id = body.tenant_id;
+        const titulo_id = body.titulo_id;
+
+        if (!tenant_id || !titulo_id) {
             return {
                 statusCode: 400,
-                status: 'Bad Request - tenant_id y ordenamiento son obligatorios',
+                status: 'Bad Request - Faltan datos en la solicitud',
             };
         }
 
-        // Obtener programación de DynamoDB
+        // Proteger el Lambda con validación del token
+        const token = event.headers?.Authorization;
+        if (!token) {
+            return {
+                statusCode: 401,
+                status: 'Unauthorized - Falta el token de autorización',
+            };
+        }
+
+        // Invocar otro Lambda para validar el token
+        const lambda = new AWS.Lambda();
+        const payloadString = JSON.stringify({
+            tenant_id,
+            token,
+        });
+
+        const invokeResponse = await lambda.invoke({
+            FunctionName: lambdaToken,
+            InvocationType: 'RequestResponse',
+            Payload: payloadString,
+        }).promise();
+
+        const response = JSON.parse(invokeResponse.Payload);
+        console.log(response);
+
+        if (response.statusCode === 403) {
+            return {
+                statusCode: 403,
+                status: 'Forbidden - Acceso NO Autorizado',
+            };
+        }
+
+        // Configurar la fecha/hora actual para comparaciones
+        const fechaActual = new Date().toISOString(); // Formato: YYYY-MM-DDTHH:mm:ss.sssZ
+        console.log(`Fecha actual (ISO): ${fechaActual}`);
+
+        // Configuración de DynamoDB para realizar la consulta (query)
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
             TableName: tablaProgramacion,
-            Key: { tenant_id, ordenamiento },
+            KeyConditionExpression: 'tenant_id = :tenant_id AND titulo_id = :titulo_id',
+            ExpressionAttributeValues: {
+                ':tenant_id': tenant_id,
+                ':titulo_id': titulo_id,
+                ':fechaActual': fechaActual,
+            },
+            FilterExpression: 'fechaHora >= :fechaActual',
         };
 
-        const result = await dynamodb.get(params).promise();
-
-        if (!result.Item) {
-            return {
-                statusCode: 404,
-                status: 'Not Found - Programación no encontrada',
-            };
-        }
+        const result = await dynamodb.query(params).promise();
 
         // Respuesta exitosa
         return {
             statusCode: 200,
-            message: 'Programación obtenida exitosamente',
-            programacion: result.Item,
+            message: 'Programaciones obtenidas exitosamente',
+            programaciones: result.Items,
         };
     } catch (error) {
         console.error(`Error inesperado: ${error.message}`);
         return {
             statusCode: 500,
-            status: 'Internal Server Error - Error al obtener la programación',
+            status: 'Internal Server Error - Error al obtener las programaciones',
             error: error.message,
         };
     }
