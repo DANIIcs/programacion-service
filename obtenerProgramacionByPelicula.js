@@ -5,7 +5,7 @@ exports.handler = async (event) => {
 
     try {
         // Validar las variables de entorno
-        if (!process.env.TABLE_NAME_PROGRAMACION || !process.env.LAMBDA_VALIDAR_TOKEN) {
+        if (!process.env.TABLE_NAME_RESERVAS || !process.env.LAMBDA_VALIDAR_TOKEN) {
             return {
                 statusCode: 500,
                 body: JSON.stringify({
@@ -14,20 +14,20 @@ exports.handler = async (event) => {
             };
         }
 
-        const tablaProgramacion = process.env.TABLE_NAME_PROGRAMACION;
-        const lambdaToken = process.env.LAMBDA_VALIDAR_TOKEN;
+        const tablaReservas = process.env.TABLE_NAME_RESERVAS; // Nombre de la tabla de reservas
+        const lambdaToken = process.env.LAMBDA_VALIDAR_TOKEN; // Lambda para validar token
 
         // Analizar el cuerpo de la solicitud
-        let body = event.body || {};
-        if (typeof body === 'string') {
-            body = JSON.parse(body);
+        let body = {};
+        if (event.body) {
+            body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
         }
 
-        // Obtener el tenant_id y titulo_id (película)
+        // Obtener los parámetros necesarios
         const tenant_id = body.tenant_id;
-        const titulo_id = body.titulo_id;
+        const titulo_id = body.titulo_id; // ID de la película
 
-        // Validar los datos requeridos
+        // Validar que los datos requeridos estén presentes
         if (!tenant_id || !titulo_id) {
             return {
                 statusCode: 400,
@@ -37,7 +37,7 @@ exports.handler = async (event) => {
             };
         }
 
-        // Concatenar tenant_id y titulo_id para el índice global
+        // Construir clave compuesta para la película
         const tenantpelicula_id = `${tenant_id}#${titulo_id}`;
 
         // Validar el token de autorización
@@ -79,8 +79,8 @@ exports.handler = async (event) => {
         // Configuración de DynamoDB para realizar la consulta (query)
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
-            TableName: tablaProgramacion,
-            IndexName: 'PeliculaIndex', // Índice global configurado en el .yml
+            TableName: tablaReservas,
+            IndexName: 'PeliculaIndex', // Índice secundario global
             KeyConditionExpression: 'tenantpelicula_id = :tenantpelicula_id',
             ExpressionAttributeValues: {
                 ':tenantpelicula_id': tenantpelicula_id,
@@ -100,7 +100,7 @@ exports.handler = async (event) => {
             }),
         };
     } catch (error) {
-        console.error(`Error inesperado: ${error.message}`);
+        console.error('Error inesperado:', error.message);
         return {
             statusCode: 500,
             body: JSON.stringify({
