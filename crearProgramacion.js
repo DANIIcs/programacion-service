@@ -1,63 +1,105 @@
 const AWS = require('aws-sdk');
-const { randomUUID } = require('crypto'); // Usar randomUUID de crypto
 
 exports.handler = async (event) => {
-    console.log('Evento recibido:', event);
+    console.log(event);
 
     try {
-        const { TABLE_NAME_PROGRAMACION, LAMBDA_VALIDAR_TOKEN } = process.env;
-        if (!TABLE_NAME_PROGRAMACION || !LAMBDA_VALIDAR_TOKEN) {
-            throw new Error('Variables de entorno no configuradas');
+        // Validar las variables de entorno
+        if (!process.env.TABLE_NAME_PROGRAMACION || !process.env.LAMBDA_VALIDAR_TOKEN) {
+            return {
+                statusCode: 500,
+                status: 'Internal Server Error - Variables de entorno no configuradas',
+            };
         }
 
-        let body = JSON.parse(event.body || '{}');
-        const { tenant_id, fechaHora, duracion, idioma, estado, formato } = body;
+        const tablaProgramacion = process.env.TABLE_NAME_PROGRAMACION;
+        const lambdaToken = process.env.LAMBDA_VALIDAR_TOKEN;
 
-        if (!tenant_id || !fechaHora || !duracion || !idioma || !estado || !formato) {
-            return { statusCode: 400, status: 'Bad Request - Faltan datos en la solicitud' };
+        // Analizar el cuerpo de la solicitud
+        let body = event.body || {};
+        if (typeof body === 'string') {
+            body = JSON.parse(body);
         }
 
+        // Obtener el tenant_id y otros datos
+        const tenantcine_id = body.tenantcine_id; //tenant_id#cine_id
+        const prog_cine_id = body.prog_cine_id; //fecha#pelicula
+        const tenantpelicula_id = body.tenantpelicula_id; //tenant_id#pelicula_id
+        const prog_pelicula_id = body.prog_pelicula_id; //fecha#cine
+        const duracion = body.duracion;
+        const idioma = body.idioma;
+
+        // Validar que los datos requeridos estén presentes
+        if (!tenantcine_id || !prog_cine_id || !tenantpelicula_id || !prog_pelicula_id || !duracion || !idioma) {
+            return {
+                statusCode: 400,
+                status: 'Bad Request - Faltan datos en la solicitud',
+            };
+        }
+
+        // Proteger el Lambda
         const token = event.headers?.Authorization;
         if (!token) {
-            return { statusCode: 401, status: 'Unauthorized - Falta el token de autorización' };
+            return {
+                statusCode: 401,
+                status: 'Unauthorized - Falta el token de autorización',
+            };
         }
 
+
+        const cadenaCine = tenantcine_id.split('#')[0];
+
+        // Invocar otro Lambda para validar el token
         const lambda = new AWS.Lambda();
+        const payloadString = JSON.stringify({
+            cadenaCine,
+            token,
+        });
+
         const invokeResponse = await lambda.invoke({
-            FunctionName: LAMBDA_VALIDAR_TOKEN,
+            FunctionName: lambdaToken,
             InvocationType: 'RequestResponse',
-            Payload: JSON.stringify({ tenant_id, token }),
+            Payload: payloadString,
         }).promise();
 
-        const response = JSON.parse(invokeResponse.Payload || '{}');
-        if (response.statusCode !== 200) {
-            return { statusCode: 403, status: 'Forbidden - Token inválido' };
+        const response = JSON.parse(invokeResponse.Payload);
+        console.log(response);
+
+        if (response.statusCode === 403) {
+            return {
+                statusCode: 403,
+                status: 'Forbidden - Acceso NO Autorizado',
+            };
         }
 
+        // Proceso - Guardar programación en DynamoDB
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const item = {
-            tenant_id,
-            ordenamiento: randomUUID(), // Usar randomUUID en lugar de uuid.v4
-            fechaHora,
+            tenantcine_id,
+            ordenamiento,
+            tenantpelicula_id,
+            ordenamiento_GSI,
             duracion,
             idioma,
-            estado,
-            formato,
-            createdAt: new Date().toISOString(),
         };
 
         await dynamodb.put({
-            TableName: TABLE_NAME_PROGRAMACION,
+            TableName: tablaProgramacion,
             Item: item,
         }).promise();
 
+        // Salida (json)
         return {
             statusCode: 201,
             message: 'Programación creada exitosamente',
             programacion: item,
         };
     } catch (error) {
-        console.error('Error:', error);
-        return { statusCode: 500, status: error.message };
+        console.error(`Error inesperado: ${error.message}`);
+        return {
+            statusCode: 500,
+            status: 'Internal Server Error - Error al crear la programación',
+            error: error.message,
+        };
     }
 };

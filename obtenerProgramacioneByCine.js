@@ -23,10 +23,10 @@ exports.handler = async (event) => {
 
         // Obtener el tenant_id y otros datos
         const tenant_id = body.tenant_id;
-        const fechaHora = body.fechaHora;
+        const cine_id = body.cine_id;
 
         // Concatenar las variables
-        const resultado = `${tenant_id}#${fechaHora}`;
+        const resultado = `${tenant_id}#${cine_id}`;
         console.log(resultado);
         
         // Proteger el Lambda
@@ -69,7 +69,7 @@ exports.handler = async (event) => {
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
             TableName: tablaProgramacion,
-            KeyConditionExpression: 'tenant_id = :prefix AND fechaHora >= :fechaActual',
+            KeyConditionExpression: 'tenantcine_id = :prefix AND ordenamiento >= :fechaActual',
             ExpressionAttributeValues: {
                 ':prefix': resultado,    // Prefijo para el tenant_id
                 ':fechaActual': fechaActual, // Fecha/hora actual
