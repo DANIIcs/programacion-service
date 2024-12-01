@@ -62,14 +62,15 @@ exports.handler = async (event) => {
         }
 
         // Configurar la fecha/hora actual para comparaciones
-        const fechaActual = new Date().toISOString(); // Formato: YYYY-MM-DD HH:mm:ss.sss
-        console.log(`Fecha actual (ISO): ${fechaActual}`);
+        // Configurar la fecha/hora actual para comparaciones
+        const fechaActual = new Date().toISOString().slice(0, 10); // Formato: YYYY-MM-DD
+        console.log(`Fecha actual (YYYY-MM-DD): ${fechaActual}`);
 
         // Configuración de DynamoDB para realizar la consulta (query)
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
             TableName: tablaProgramacion,
-            KeyConditionExpression: 'tenantcine_id = :prefix AND ordenamiento >= :fechaActual',
+            KeyConditionExpression: 'tenantcine_id = :prefix AND begins_with(prog_cine_id, :fechaActual)',
             ExpressionAttributeValues: {
                 ':prefix': resultado,    // Prefijo para el tenant_id
                 ':fechaActual': fechaActual, // Fecha/hora actual
