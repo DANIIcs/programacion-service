@@ -25,15 +25,15 @@ functions:
     handler: obtenerProgramacionByPelicula.handler
     events:
       - http:
-          path: /programacion/{tenant_id}/{ordenamiento}
+          path: /programacion/{tenant_id}/{titulo_id}
           method: get
           cors: true
 
-  obtenerProgramaciones:
+  obtenerProgramacioneByCine:
     handler: obtenerProgramacioneByCine.handler
     events:
       - http:
-          path: /programaciones
+          path: /programacion/{tenant_id}/{titulo_id}
           method: get
           cors: true
 

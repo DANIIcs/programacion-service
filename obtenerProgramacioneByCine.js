@@ -1,8 +1,7 @@
 const AWS = require('aws-sdk');
-const { v4: uuidv4 } = require('uuid');
 
 exports.handler = async (event) => {
-    console.log('Evento recibido:', event);
+    console.log('Obteniendo todas las programaciones');
 
     try {
         // Validar las variables de entorno
@@ -22,18 +21,15 @@ exports.handler = async (event) => {
             body = JSON.parse(body);
         }
 
-        // Obtener los datos necesarios
-        const { tenant_id, fechaHora, duracion, idioma, estado, formato } = body;
+        // Obtener el tenant_id y otros datos
+        const tenant_id = body.tenant_id;
+        const fechaHora = body.fechaHora;
 
-        // Validar que los datos requeridos estén presentes
-        if (!tenant_id || !fechaHora || !duracion || !idioma || !estado || !formato) {
-            return {
-                statusCode: 400,
-                status: 'Bad Request - Faltan datos en la solicitud',
-            };
-        }
-
-        // Validar el token de autorización
+        // Concatenar las variables
+        const resultado = `${tenant_id}#${fechaHora}`;
+        console.log(resultado);
+        
+        // Proteger el Lambda
         const token = event.headers?.Authorization;
         if (!token) {
             return {
@@ -44,7 +40,10 @@ exports.handler = async (event) => {
 
         // Invocar otro Lambda para validar el token
         const lambda = new AWS.Lambda();
-        const payloadString = JSON.stringify({ tenant_id, token });
+        const payloadString = JSON.stringify({
+            tenant_id,
+            token,
+        });
 
         const invokeResponse = await lambda.invoke({
             FunctionName: lambdaToken,
@@ -53,44 +52,43 @@ exports.handler = async (event) => {
         }).promise();
 
         const response = JSON.parse(invokeResponse.Payload);
-        console.log('Respuesta de validación del token:', response);
+        console.log(response);
 
-        if (response.statusCode !== 200) {
+        if (response.statusCode === 403) {
             return {
                 statusCode: 403,
                 status: 'Forbidden - Acceso NO Autorizado',
             };
         }
 
-        // Proceso - Guardar programación en DynamoDB
+        // Configurar la fecha/hora actual para comparaciones
+        const fechaActual = new Date().toISOString(); // Formato: YYYY-MM-DD HH:mm:ss.sss
+        console.log(`Fecha actual (ISO): ${fechaActual}`);
+
+        // Configuración de DynamoDB para realizar la consulta (query)
         const dynamodb = new AWS.DynamoDB.DocumentClient();
-        const item = {
-            tenant_id,
-            ordenamiento: uuidv4(),
-            fechaHora,
-            duracion,
-            idioma,
-            estado,
-            formato,
-            createdAt: new Date().toISOString(), // Timestamp de creación
+        const params = {
+            TableName: tablaProgramacion,
+            KeyConditionExpression: 'tenant_id = :prefix AND fechaHora >= :fechaActual',
+            ExpressionAttributeValues: {
+                ':prefix': resultado,    // Prefijo para el tenant_id
+                ':fechaActual': fechaActual, // Fecha/hora actual
+            },
         };
 
-        await dynamodb.put({
-            TableName: tablaProgramacion,
-            Item: item,
-        }).promise();
+        const result = await dynamodb.query(params).promise();
 
-        // Respuesta de éxito
+        // Respuesta exitosa
         return {
-            statusCode: 201,
-            message: 'Programación creada exitosamente',
-            programacion: item,
+            statusCode: 200,
+            message: 'Programaciones obtenidas exitosamente',
+            programaciones: result.Items,
         };
     } catch (error) {
         console.error(`Error inesperado: ${error.message}`);
         return {
             statusCode: 500,
-            status: 'Internal Server Error - Error al crear la programación',
+            status: 'Internal Server Error - Error al obtener las programaciones',
             error: error.message,
         };
     }

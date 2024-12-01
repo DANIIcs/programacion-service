@@ -5,15 +5,13 @@ exports.handler = async (event) => {
 
     try {
         // Validar las variables de entorno
-        if (!process.env.TABLE_NAME_PROGRAMACION || !process.env.LAMBDA_VALIDAR_TOKEN) {
-            return {
-                statusCode: 500,
-                status: 'Internal Server Error - Variables de entorno no configuradas',
-            };
+        const { TABLE_NAME_PROGRAMACION, LAMBDA_VALIDAR_TOKEN } = process.env;
+        if (!TABLE_NAME_PROGRAMACION || !LAMBDA_VALIDAR_TOKEN) {
+            throw new Error('Variables de entorno no configuradas');
         }
 
-        const tablaProgramacion = process.env.TABLE_NAME_PROGRAMACION;
-        const lambdaToken = process.env.LAMBDA_VALIDAR_TOKEN;
+        const tablaProgramacion = TABLE_NAME_PROGRAMACION;
+        const lambdaToken = LAMBDA_VALIDAR_TOKEN;
 
         // Analizar el cuerpo de la solicitud
         let body = event.body || {};
@@ -22,8 +20,7 @@ exports.handler = async (event) => {
         }
 
         // Obtener los parámetros necesarios
-        const tenant_id = body.tenant_id;
-        const titulo_id = body.titulo_id;
+        const { tenant_id, titulo_id } = body;
 
         if (!tenant_id || !titulo_id) {
             return {
@@ -43,42 +40,37 @@ exports.handler = async (event) => {
 
         // Invocar otro Lambda para validar el token
         const lambda = new AWS.Lambda();
-        const payloadString = JSON.stringify({
-            tenant_id,
-            token,
-        });
-
         const invokeResponse = await lambda.invoke({
             FunctionName: lambdaToken,
             InvocationType: 'RequestResponse',
-            Payload: payloadString,
+            Payload: JSON.stringify({ tenant_id, token }),
         }).promise();
 
-        const response = JSON.parse(invokeResponse.Payload);
-        console.log(response);
+        const response = JSON.parse(invokeResponse.Payload || '{}');
+        console.log('Respuesta de validación del token:', response);
 
-        if (response.statusCode === 403) {
+        if (response.statusCode !== 200) {
             return {
                 statusCode: 403,
-                status: 'Forbidden - Acceso NO Autorizado',
+                status: 'Forbidden - Token inválido',
             };
         }
 
         // Configurar la fecha/hora actual para comparaciones
-        const fechaActual = new Date().toISOString(); // Formato: YYYY-MM-DDTHH:mm:ss.sssZ
+        const fechaActual = new Date().toISOString();
         console.log(`Fecha actual (ISO): ${fechaActual}`);
 
         // Configuración de DynamoDB para realizar la consulta (query)
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
             TableName: tablaProgramacion,
-            KeyConditionExpression: 'tenant_id = :tenant_id AND titulo_id = :titulo_id',
+            IndexName: 'PeliculaIndex', // Nombre del GSI
+            KeyConditionExpression: 'titulo_id = :titulo_id',
             ExpressionAttributeValues: {
-                ':tenant_id': tenant_id,
                 ':titulo_id': titulo_id,
                 ':fechaActual': fechaActual,
             },
-            FilterExpression: 'fechaHora >= :fechaActual',
+            FilterExpression: 'fechaHora >= :fechaActual', // Filtra por fecha/hora
         };
 
         const result = await dynamodb.query(params).promise();
