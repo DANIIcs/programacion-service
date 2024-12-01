@@ -7,44 +7,51 @@ exports.handler = async (event) => {
         // Validar las variables de entorno
         const { TABLE_NAME_PROGRAMACION, LAMBDA_VALIDAR_TOKEN } = process.env;
         if (!TABLE_NAME_PROGRAMACION || !LAMBDA_VALIDAR_TOKEN) {
-            throw new Error('Variables de entorno no configuradas');
+            return {
+                statusCode: 500,
+                body: JSON.stringify({
+                    status: 'Internal Server Error - Variables de entorno no configuradas',
+                }),
+            };
         }
 
         const tablaProgramacion = TABLE_NAME_PROGRAMACION;
         const lambdaToken = LAMBDA_VALIDAR_TOKEN;
 
-        // Analizar el cuerpo de la solicitud
-        let body = event.body || {};
-        if (typeof body === 'string') {
-            body = JSON.parse(body);
-        }
-
-        // Obtener los parámetros necesarios
-        const { tenant_id, titulo_id } = body;
+        // Analizar los parámetros de la solicitud
+        const { pathParameters, headers } = event;
+        const tenant_id = pathParameters?.tenant_id;
+        const titulo_id = pathParameters?.titulo_id;
 
         if (!tenant_id || !titulo_id) {
             return {
                 statusCode: 400,
-                status: 'Bad Request - Faltan datos en la solicitud',
+                body: JSON.stringify({
+                    status: 'Bad Request - Faltan datos en la solicitud (tenant_id o titulo_id)',
+                }),
             };
         }
 
-        // Proteger el Lambda con validación del token
-        const token = event.headers?.Authorization;
+        // Validar el token de autorización
+        const token = headers?.Authorization || headers?.authorization;
         if (!token) {
             return {
                 statusCode: 401,
-                status: 'Unauthorized - Falta el token de autorización',
+                body: JSON.stringify({
+                    status: 'Unauthorized - Falta el token de autorización',
+                }),
             };
         }
 
         // Invocar otro Lambda para validar el token
         const lambda = new AWS.Lambda();
-        const invokeResponse = await lambda.invoke({
-            FunctionName: lambdaToken,
-            InvocationType: 'RequestResponse',
-            Payload: JSON.stringify({ tenant_id, token }),
-        }).promise();
+        const invokeResponse = await lambda
+            .invoke({
+                FunctionName: lambdaToken,
+                InvocationType: 'RequestResponse',
+                Payload: JSON.stringify({ tenant_id, token }),
+            })
+            .promise();
 
         const response = JSON.parse(invokeResponse.Payload || '{}');
         console.log('Respuesta de validación del token:', response);
@@ -52,41 +59,43 @@ exports.handler = async (event) => {
         if (response.statusCode !== 200) {
             return {
                 statusCode: 403,
-                status: 'Forbidden - Token inválido',
+                body: JSON.stringify({
+                    status: 'Forbidden - Token inválido',
+                }),
             };
         }
 
-        // Configurar la fecha/hora actual para comparaciones
-        const fechaActual = new Date().toISOString();
-        console.log(`Fecha actual (ISO): ${fechaActual}`);
-
-        // Configuración de DynamoDB para realizar la consulta (query)
+        // Configurar DynamoDB para realizar la consulta
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const params = {
             TableName: tablaProgramacion,
-            IndexName: 'PeliculaIndex', // Nombre del GSI
-            KeyConditionExpression: 'titulo_id = :titulo_id',
+            IndexName: 'PeliculaIndex', // Índice secundario global (GSI)
+            KeyConditionExpression: 'tenantpelicula_id = :tenantpelicula_id',
             ExpressionAttributeValues: {
-                ':titulo_id': titulo_id,
-                ':fechaActual': fechaActual,
+                ':tenantpelicula_id': `${tenant_id}#${titulo_id}`, // Concatenación de tenant_id y titulo_id
             },
-            FilterExpression: 'fechaHora >= :fechaActual', // Filtra por fecha/hora
         };
 
+        console.log('Parámetros de DynamoDB Query:', params);
         const result = await dynamodb.query(params).promise();
+        console.log('Resultados obtenidos de DynamoDB:', result.Items);
 
         // Respuesta exitosa
         return {
             statusCode: 200,
-            message: 'Programaciones obtenidas exitosamente',
-            programaciones: result.Items,
+            body: JSON.stringify({
+                message: 'Programaciones obtenidas exitosamente',
+                programaciones: result.Items,
+            }),
         };
     } catch (error) {
-        console.error(`Error inesperado: ${error.message}`);
+        console.error('Error inesperado:', error.message);
         return {
             statusCode: 500,
-            status: 'Internal Server Error - Error al obtener las programaciones',
-            error: error.message,
+            body: JSON.stringify({
+                status: 'Internal Server Error - Error al obtener las programaciones',
+                error: error.message,
+            }),
         };
     }
 };
