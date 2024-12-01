@@ -33,7 +33,7 @@ functions:
     handler: obtenerProgramacioneByCine.handler
     events:
       - http:
-          path: /programacion/{tenant_id}/{titulo_id}
+          path: /programacion/{tenant_id}/{fechaHora}
           method: get
           cors: true
 
