@@ -21,8 +21,8 @@ functions:
           method: post
           cors: true
 
-  obtenerProgramacionById:
-    handler: obtenerProgramacionById.handler
+  obtenerProgramacionByPelicula:
+    handler: obtenerProgramacionByPelicula.handler
     events:
       - http:
           path: /programacion/{tenant_id}/{ordenamiento}
@@ -30,28 +30,13 @@ functions:
           cors: true
 
   obtenerProgramaciones:
-    handler: obtenerProgramaciones.handler
+    handler: obtenerProgramacioneByCine.handler
     events:
       - http:
           path: /programaciones
           method: get
           cors: true
 
-  modificarProgramacion:
-    handler: modificarProgramacion.handler
-    events:
-      - http:
-          path: /programacion/{tenant_id}/{ordenamiento}
-          method: put
-          cors: true
-
-  eliminarProgramacion:
-    handler: eliminarProgramacion.handler
-    events:
-      - http:
-          path: /programacion
-          method: delete
-          cors: true
 
 resources:
   Resources:
