@@ -22,15 +22,15 @@ exports.handler = async (event) => {
         }
 
         // Obtener el tenant_id y otros datos
-        const tenant_id = body.tenant_id;
-        const fechaHora = body.fechaHora;
+        const tenantcine_id = body.tenantcine_id; //tenant_id#cine_id
+        const prog_cine_id = body.prog_cine_id; //fecha#pelicula
+        const tenantpelicula_id = body.tenantpelicula_id; //tenant_id#pelicula_id
+        const prog_pelicula_id = body.prog_pelicula_id; //fecha#cine
         const duracion = body.duracion;
         const idioma = body.idioma;
-        const estado = body.estado;
-        const formato = body.formato;
 
         // Validar que los datos requeridos estén presentes
-        if (!tenant_id || !fechaHora || !duracion || !idioma || !estado || !formato) {
+        if (!tenantcine_id || !prog_cine_id || !tenantpelicula_id || !prog_pelicula_id || !duracion || !idioma) {
             return {
                 statusCode: 400,
                 status: 'Bad Request - Faltan datos en la solicitud',
@@ -46,10 +46,13 @@ exports.handler = async (event) => {
             };
         }
 
+
+        const cadenaCine = tenantcine_id.split('#')[0];
+
         // Invocar otro Lambda para validar el token
         const lambda = new AWS.Lambda();
         const payloadString = JSON.stringify({
-            tenant_id,
+            cadenaCine,
             token,
         });
 
@@ -72,13 +75,12 @@ exports.handler = async (event) => {
         // Proceso - Guardar programación en DynamoDB
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const item = {
-            tenant_id,
-            ordenamiento: require('uuid').v4(),
-            fechaHora,
+            tenantcine_id,
+            ordenamiento,
+            tenantpelicula_id,
+            ordenamiento_GSI,
             duracion,
             idioma,
-            estado,
-            formato,
         };
 
         await dynamodb.put({

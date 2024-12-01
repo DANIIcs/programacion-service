@@ -5,7 +5,7 @@ provider:
   name: aws
   runtime: nodejs16.x
   memorySize: 1024
-  timeout: 30
+  timeout: 29
   iam:
     role: arn:aws:iam::397279833444:role/LabRole
   environment:
@@ -20,23 +20,25 @@ functions:
           path: /programacion
           method: post
           cors: true
+          integration: lambda
 
   obtenerProgramacionByPelicula:
     handler: obtenerProgramacionByPelicula.handler
     events:
       - http:
-          path: /programacion/{tenant_id}/{ordenamiento}
-          method: get
+          path: /programacion/buscar_por_pelicula
+          method: post
           cors: true
+          integration: lambda
 
-  obtenerProgramaciones:
+  obtenerProgramacionesByCine:
     handler: obtenerProgramacioneByCine.handler
     events:
       - http:
-          path: /programaciones
-          method: get
+          path: /programacion/buscar_por_cine
+          method: post
           cors: true
-
+          integration: lambda
 
 resources:
   Resources:
@@ -47,16 +49,16 @@ resources:
         AttributeDefinitions:
           - AttributeName: tenantcine_id
             AttributeType: S
-          - AttributeName: ordenamiento
+          - AttributeName: prog_cine_id
             AttributeType: S
           - AttributeName: tenantpelicula_id
             AttributeType: S 
-          - AttributeName: ordenamiento_GSI
+          - AttributeName: prog_pelicula_id
             AttributeType: S
         KeySchema:
           - AttributeName: tenantcine_id
             KeyType: HASH
-          - AttributeName: ordenamiento
+          - AttributeName: prog_cine_id
             KeyType: RANGE
         # Índice Secundario Global (GSI)
         GlobalSecondaryIndexes:
@@ -64,7 +66,7 @@ resources:
             KeySchema:
               - AttributeName: tenantpelicula_id
                 KeyType: HASH
-              - AttributeName: ordenamiento_GSI
+              - AttributeName: prog_pelicula_id
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL
