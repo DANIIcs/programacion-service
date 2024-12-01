@@ -32,7 +32,7 @@ exports.handler = async (event) => {
             };
         }
 
-        // Validar el token de autorización
+        // Validar el token de autorizaciónn
         const token = headers?.Authorization || headers?.authorization;
         if (!token) {
             return {
