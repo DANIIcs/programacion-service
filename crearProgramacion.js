@@ -76,9 +76,9 @@ exports.handler = async (event) => {
         const dynamodb = new AWS.DynamoDB.DocumentClient();
         const item = {
             tenantcine_id,
-            ordenamiento,
+            prog_cine_id,
             tenantpelicula_id,
-            ordenamiento_GSI,
+            prog_pelicula_id,
             duracion,
             idioma,
         };
@@ -103,3 +103,4 @@ exports.handler = async (event) => {
         };
     }
 };
+
